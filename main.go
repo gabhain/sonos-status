@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"image"
 	"image/color"
@@ -47,8 +48,12 @@ type RoomUI struct {
 	TimeLabel    *widget.Label
 }
 
+//go:embed Icon.png
+var iconBytes []byte
+
 func main() {
 	myApp := app.New()
+	myApp.SetIcon(fyne.NewStaticResource("Icon.png", iconBytes))
 	myWindow := myApp.NewWindow("Sonos Status Utility")
 	myWindow.Resize(fyne.NewSize(650, 850))
 
