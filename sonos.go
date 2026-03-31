@@ -559,8 +559,8 @@ func (s *Speaker) UpdateStatus() error {
 
 	track, err := s.Player.GetTrackInfo()
 	if err == nil && track.Title != "" && !strings.Contains(track.URI, "htastream") && !strings.Contains(track.URI, "x-rincon:") {
-		s.Track = track.Title
-		s.Artist = track.Creator
+		s.Track = cleanString(track.Title)
+		s.Artist = cleanString(track.Creator)
 		s.Duration = track.Duration
 		s.Progress = track.Progress
 		s.DurationSec = parseDuration(track.Duration)
@@ -679,4 +679,42 @@ func (s *Speaker) Next() error {
 func (s *Speaker) Previous() error {
 	if s.Player == nil { return nil }
 	return s.Player.Previous()
+}
+
+func cleanString(s string) string {
+	if s == "" {
+		return ""
+	}
+	// If it's a URL or contains query parameters, take only the base name/path
+	if strings.Contains(s, "?") {
+		s = strings.Split(s, "?")[0]
+	}
+
+	// Check if it's a file path or URL-like path
+	if strings.Contains(s, "/") {
+		parts := strings.Split(s, "/")
+		s = parts[len(parts)-1]
+	}
+
+	// Remove common audio extensions
+	extensions := []string{".mp3", ".aac", ".flac", ".wav", ".m4a", ".ogg"}
+	lowerS := strings.ToLower(s)
+	for _, ext := range extensions {
+		if strings.HasSuffix(lowerS, ext) {
+			s = s[:len(s)-len(ext)]
+			break
+		}
+	}
+
+	// Replace underscores with spaces for filenames
+	if !strings.Contains(s, " ") && strings.Contains(s, "_") {
+		s = strings.ReplaceAll(s, "_", " ")
+	}
+
+	// If it's still messy (e.g. contains = or &), it's probably a fallback URL
+	if strings.Contains(s, "=") || strings.Contains(s, "&") {
+		return "Streaming Audio"
+	}
+
+	return strings.TrimSpace(s)
 }
