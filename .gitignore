@@ -1,0 +1,15 @@
+# Binaries
+sonos-status
+sonos-status.exe
+*.app/
+*.pkg
+*.zip
+*.tar.gz
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+go.work
