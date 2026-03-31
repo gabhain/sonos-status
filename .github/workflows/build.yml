@@ -31,7 +31,7 @@ jobs:
           pkgbuild --component "SonosStatus.app" --install-location "/Applications" "SonosStatus.pkg"
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SonosStatus-macOS
           path: SonosStatus.pkg
@@ -67,7 +67,7 @@ jobs:
           tar -czvf SonosStatus-Linux.tar.gz SonosStatus
 
       - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SonosStatus-Linux
           path: SonosStatus-Linux.tar.gz
@@ -101,7 +101,7 @@ jobs:
           zip SonosStatus-Windows.zip SonosStatus.exe
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SonosStatus-Windows
           path: SonosStatus-Windows.zip
@@ -112,7 +112,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
