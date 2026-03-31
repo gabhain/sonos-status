@@ -61,9 +61,16 @@ jobs:
           fyne package -os linux -name "SonosStatus" -icon Icon.png
           # Debug to see what was actually created
           ls -R
-          # On Linux, fyne package sometimes uses the name from go.mod or binary name
-          # We ensure the target file exists or rename it to SonosStatus
+          # On Linux, fyne package creates a .tar.xz archive
+          if [ -f "SonosStatus.tar.xz" ]; then
+            tar -xvf SonosStatus.tar.xz
+            # The extracted binary might be named SonosStatus or sonos-status
+            if [ -f "usr/bin/SonosStatus" ]; then mv usr/bin/SonosStatus SonosStatus; fi
+            if [ -f "usr/bin/sonos-status" ]; then mv usr/bin/sonos-status SonosStatus; fi
+          fi
+          # Fallback check for raw binary if it wasn't a tarball
           if [ -f "sonos-status" ] && [ ! -f "SonosStatus" ]; then mv sonos-status SonosStatus; fi
+          
           tar -czvf SonosStatus-Linux.tar.gz SonosStatus
 
       - name: Upload Linux Artifact
