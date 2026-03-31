@@ -66,3 +66,35 @@ jobs:
         with:
           name: SonosStatus-Linux
           path: SonosStatus-Linux.tar.gz
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.1'
+          cache: true
+
+      - name: Install Windows Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64
+
+      - name: Install Fyne CLI
+        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Package Windows
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          # Cross-compile for Windows
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc fyne package -os windows -name "SonosStatus" -icon icon.png || GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc fyne package -os windows -name "SonosStatus"
+          zip SonosStatus-Windows.zip SonosStatus.exe
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SonosStatus-Windows
+          path: SonosStatus-Windows.zip

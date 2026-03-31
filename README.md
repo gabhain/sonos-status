@@ -54,6 +54,10 @@ This project uses **GitHub Actions** to automatically build and package the appl
 - **Format**: Compressed Archive (`.tar.gz`).
 - **Installation**: Extract the archive and run the `SonosStatus` binary. Ensure you have the necessary graphics libraries (Mesa/X11) installed.
 
+### Windows
+- **Format**: Compressed Zip (`.zip`).
+- **Installation**: Extract the archive and run `SonosStatus.exe`.
+
 ### How to Download
 1. Go to the **Actions** tab in your GitHub repository.
 2. Select the latest successful workflow run.
