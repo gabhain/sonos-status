@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-macos:
     runs-on: macos-latest
@@ -22,13 +19,13 @@ jobs:
           cache: true
 
       - name: Install Fyne CLI
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Package macOS App
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           # Package as a .app first
-          fyne package -os darwin -name "SonosStatus" -icon icon.png || fyne package -os darwin -name "SonosStatus"
+          fyne package -os darwin -name "SonosStatus"
           
           # Build the .pkg installer
           pkgbuild --component "SonosStatus.app" --install-location "/Applications" "SonosStatus.pkg"
@@ -56,12 +53,12 @@ jobs:
           sudo apt-get install -y libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev libasound2-dev pkg-config
 
       - name: Install Fyne CLI
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Package Linux
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          fyne package -os linux -name "SonosStatus" -icon icon.png || fyne package -os linux -name "SonosStatus"
+          fyne package -os linux -name "SonosStatus"
           tar -czvf SonosStatus-Linux.tar.gz SonosStatus
 
       - name: Upload Linux Artifact
@@ -87,13 +84,13 @@ jobs:
           sudo apt-get install -y gcc-mingw-w64-x86-64
 
       - name: Install Fyne CLI
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Package Windows
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           # Cross-compile for Windows
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc fyne package -os windows -name "SonosStatus" -icon icon.png || GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc fyne package -os windows -name "SonosStatus"
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc fyne package -os windows -name "SonosStatus"
           zip SonosStatus-Windows.zip SonosStatus.exe
 
       - name: Upload Windows Artifact
