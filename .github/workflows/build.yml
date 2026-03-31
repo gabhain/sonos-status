@@ -64,13 +64,19 @@ jobs:
           # On Linux, fyne package creates a .tar.xz archive
           if [ -f "SonosStatus.tar.xz" ]; then
             tar -xvf SonosStatus.tar.xz
-            # The extracted binary might be named SonosStatus or sonos-status
-            if [ -f "usr/bin/SonosStatus" ]; then mv usr/bin/SonosStatus SonosStatus; fi
-            if [ -f "usr/bin/sonos-status" ]; then mv usr/bin/sonos-status SonosStatus; fi
+            # Find the binary in the extracted usr directory
+            # It could be in usr/bin or usr/local/bin
+            BINARY_PATH=$(find usr -type f -name "SonosStatus" -o -name "sonos-status" | head -n 1)
+            if [ -n "$BINARY_PATH" ]; then
+              mv "$BINARY_PATH" SonosStatus
+            fi
           fi
           # Fallback check for raw binary if it wasn't a tarball
           if [ -f "sonos-status" ] && [ ! -f "SonosStatus" ]; then mv sonos-status SonosStatus; fi
           
+          # Final check - if we still don't have SonosStatus, see if anything else was created
+          if [ ! -f "SonosStatus" ] && [ -f "sonos-status" ]; then mv sonos-status SonosStatus; fi
+
           tar -czvf SonosStatus-Linux.tar.gz SonosStatus
 
       - name: Upload Linux Artifact
