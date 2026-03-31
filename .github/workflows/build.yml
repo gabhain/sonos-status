@@ -22,7 +22,7 @@ jobs:
           cache: true
 
       - name: Install Fyne CLI
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Package macOS App
         run: |
@@ -56,12 +56,15 @@ jobs:
           sudo apt-get install -y libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev libasound2-dev pkg-config
 
       - name: Install Fyne CLI
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Package Linux
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           fyne package -os linux -name "SonosStatus" -icon Icon.png
+          # On Linux, fyne package sometimes uses the name from go.mod or binary name
+          # We ensure the target file exists or rename it to SonosStatus
+          if [ -f "sonos-status" ] && [ ! -f "SonosStatus" ]; then mv sonos-status SonosStatus; fi
           tar -czvf SonosStatus-Linux.tar.gz SonosStatus
 
       - name: Upload Linux Artifact
@@ -87,13 +90,15 @@ jobs:
           sudo apt-get install -y gcc-mingw-w64-x86-64
 
       - name: Install Fyne CLI
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Package Windows
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           # Cross-compile for Windows
           GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc fyne package -os windows -name "SonosStatus" -icon Icon.png
+          # If output is lowercase from module name, rename it
+          if [ -f "sonos-status.exe" ] && [ ! -f "SonosStatus.exe" ]; then mv sonos-status.exe SonosStatus.exe; fi
           zip SonosStatus-Windows.zip SonosStatus.exe
 
       - name: Upload Windows Artifact
