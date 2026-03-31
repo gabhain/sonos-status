@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"image"
 	"image/color"
+	_ "image/jpeg"
+	_ "image/png"
 	"strings"
 	"time"
 
@@ -10,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -17,6 +22,8 @@ import (
 
 type RoomUI struct {
 	Container    *fyne.Container
+	BgRect       *canvas.Rectangle
+	LastArtURL   string
 	NameLabel    *widget.Label
 	ModelLabel   *widget.Label
 	IPLabel      *widget.Label
@@ -26,11 +33,15 @@ type RoomUI struct {
 	AlbumArt     *canvas.Image
 	ArtContainer *fyne.Container
 	PlayPauseBtn *widget.Button
+	PrevBtn      *widget.Button
+	NextBtn      *widget.Button
 	MuteBtn      *widget.Button
 	NightBtn     *widget.Button
 	SpeechBtn    *widget.Button
 	LoudnessBtn  *widget.Button
 	VolSlider    *widget.Slider
+	BassSlider   *widget.Slider
+	TrebleSlider *widget.Slider
 	ProgressBar  *widget.ProgressBar
 	WifiLabel    *widget.Label
 	TimeLabel    *widget.Label
@@ -41,11 +52,27 @@ func main() {
 	myWindow := myApp.NewWindow("Sonos Status Utility")
 	myWindow.Resize(fyne.NewSize(650, 850))
 
+	// System Tray Setup
+	if desk, ok := myApp.(desktop.App); ok {
+		m := fyne.NewMenu("Sonos Status",
+			fyne.NewMenuItem("Show Dashboard", func() {
+				myWindow.Show()
+			}),
+		)
+		desk.SetSystemTrayMenu(m)
+	}
+
+	// Close to tray
+	myWindow.SetCloseIntercept(func() {
+		myWindow.Hide()
+	})
+
 	var speakers []*Speaker
 	roomUIs := make(map[string]*RoomUI)
 	accordion := widget.NewAccordion()
 
 	statusLabel := widget.NewLabel("Ready")
+	var eventServer *EventServer
 
 	refreshFunc := func() {
 		fyne.Do(func() { statusLabel.SetText("Scanning...") })
@@ -64,6 +91,14 @@ func main() {
 					ui := createRoomUI(s)
 					roomUIs[s.UID] = ui
 					
+					// Set callback for EventServer
+					s.OnUpdate = func() {
+						fyne.Do(func() {
+							updateUI(ui, s)
+							accordion.Refresh()
+						})
+					}
+					
 					item := widget.NewAccordionItem(s.Name, ui.Container)
 					accordion.Append(item)
 				}
@@ -71,12 +106,24 @@ func main() {
 					accordion.Open(0)
 				}
 				accordion.Refresh()
+
+				// Start Event Server
+				if eventServer != nil {
+					// Stop old one if needed? (For simplicity, we'll just create one)
+				}
+				es, err := NewEventServer(speakers)
+				if err == nil {
+					eventServer = es
+					go eventServer.Start()
+				}
 			})
 		}()
 	}
 
 	go func() {
-		ticker := time.NewTicker(3 * time.Second)
+		// Slow down the ticker - it's now just a safety fallback 
+		// for track progress which doesn't always send events every second
+		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
 			for _, s := range speakers {
 				s.UpdateStatus()
@@ -142,6 +189,20 @@ func createRoomUI(s *Speaker) *RoomUI {
 			fyne.Do(func() { updateUI(ui, s) })
 		}()
 	})
+	ui.PrevBtn = widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
+		go func() {
+			s.Previous()
+			s.UpdateStatus()
+			fyne.Do(func() { updateUI(ui, s) })
+		}()
+	})
+	ui.NextBtn = widget.NewButtonWithIcon("", theme.MediaSkipNextIcon(), func() {
+		go func() {
+			s.Next()
+			s.UpdateStatus()
+			fyne.Do(func() { updateUI(ui, s) })
+		}()
+	})
 	
 	ui.MuteBtn = widget.NewButtonWithIcon("", theme.VolumeUpIcon(), func() {
 		go func() {
@@ -156,17 +217,17 @@ func createRoomUI(s *Speaker) *RoomUI {
 		go s.SetVolume(uint16(v))
 	}
 	
-	controlsRow := container.NewBorder(nil, nil, container.NewHBox(ui.PlayPauseBtn, ui.MuteBtn), nil, ui.VolSlider)
+	controlsRow := container.NewBorder(nil, nil, container.NewHBox(ui.PrevBtn, ui.PlayPauseBtn, ui.NextBtn, ui.MuteBtn), nil, ui.VolSlider)
 
-	// 3. Audio Modes (Night, Speech, Loudness)
-	ui.NightBtn = widget.NewButtonWithIcon("Night Mode", theme.VisibilityIcon(), func() {
+	// 3. Audio Modes & EQ (Night, Speech, Loudness + Bass/Treble)
+	ui.NightBtn = widget.NewButtonWithIcon("Night", theme.VisibilityIcon(), func() {
 		go func() {
 			s.ToggleNightMode()
 			s.UpdateStatus()
 			fyne.Do(func() { updateUI(ui, s) })
 		}()
 	})
-	ui.SpeechBtn = widget.NewButtonWithIcon("Speech Enhancement", theme.VolumeUpIcon(), func() {
+	ui.SpeechBtn = widget.NewButtonWithIcon("Speech", theme.VolumeUpIcon(), func() {
 		go func() {
 			s.ToggleSpeechEnhancement()
 			s.UpdateStatus()
@@ -180,7 +241,25 @@ func createRoomUI(s *Speaker) *RoomUI {
 			fyne.Do(func() { updateUI(ui, s) })
 		}()
 	})
-	modesRow := container.NewGridWithColumns(3, ui.NightBtn, ui.SpeechBtn, ui.LoudnessBtn)
+	
+	ui.BassSlider = widget.NewSlider(-10, 10)
+	ui.BassSlider.OnChanged = func(v float64) {
+		go s.SetBass(int(v))
+	}
+	ui.TrebleSlider = widget.NewSlider(-10, 10)
+	ui.TrebleSlider.OnChanged = func(v float64) {
+		go s.SetTreble(int(v))
+	}
+
+	eqRow := container.NewGridWithColumns(2, 
+		container.NewVBox(widget.NewLabelWithStyle("Bass", fyne.TextAlignCenter, fyne.TextStyle{Italic: true}), ui.BassSlider),
+		container.NewVBox(widget.NewLabelWithStyle("Treble", fyne.TextAlignCenter, fyne.TextStyle{Italic: true}), ui.TrebleSlider),
+	)
+
+	modesRow := container.NewVBox(
+		container.NewGridWithColumns(3, ui.NightBtn, ui.SpeechBtn, ui.LoudnessBtn),
+		eqRow,
+	)
 
 	// 4. Room Info (Hardware, IP, Wi-Fi)
 	ui.ModelLabel = widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
@@ -201,8 +280,8 @@ func createRoomUI(s *Speaker) *RoomUI {
 	)
 
 	// Combine into card-like structure
-	bg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 30, A: 255})
-	ui.Container = container.NewMax(bg, container.NewPadded(container.NewVBox(
+	ui.BgRect = canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 30, A: 255})
+	ui.Container = container.NewMax(ui.BgRect, container.NewPadded(container.NewVBox(
 		playbackRow,
 		container.NewPadded(controlsRow),
 		modesRow,
@@ -211,6 +290,40 @@ func createRoomUI(s *Speaker) *RoomUI {
 
 	updateUI(ui, s)
 	return ui
+}
+
+func getAverageColor(res fyne.Resource) color.Color {
+	img, _, err := image.Decode(bytes.NewReader(res.Content()))
+	if err != nil {
+		return color.NRGBA{R: 30, G: 30, B: 30, A: 255}
+	}
+
+	var r, g, b, count uint64
+	bounds := img.Bounds()
+	// Sample every 5th pixel for speed
+	for y := bounds.Min.Y; y < bounds.Max.Y; y += 5 {
+		for x := bounds.Min.X; x < bounds.Max.X; x += 5 {
+			pr, pg, pb, _ := img.At(x, y).RGBA()
+			r += uint64(pr >> 8)
+			g += uint64(pg >> 8)
+			b += uint64(pb >> 8)
+			count++
+		}
+	}
+	if count == 0 {
+		return color.NRGBA{R: 30, G: 30, B: 30, A: 255}
+	}
+
+	// Calculate average and blend 30/70 with dark theme background (30,30,30)
+	avgR := uint8(r / count)
+	avgG := uint8(g / count)
+	avgB := uint8(b / count)
+	
+	tintR := uint8(float64(avgR)*0.2 + 30*0.8)
+	tintG := uint8(float64(avgG)*0.2 + 30*0.8)
+	tintB := uint8(float64(avgB)*0.2 + 30*0.8)
+	
+	return color.NRGBA{R: tintR, G: tintG, B: tintB, A: 255}
 }
 
 func updateUI(ui *RoomUI, s *Speaker) {
@@ -242,22 +355,38 @@ func updateUI(ui *RoomUI, s *Speaker) {
 		ui.TimeLabel.Hide()
 	}
 
-	// Album Art
+	// Album Art (with Caching & Dynamic Theming)
 	if s.AlbumArtURL != "" {
-		res, err := fyne.LoadResourceFromURLString(s.AlbumArtURL)
-		if err == nil {
-			ui.AlbumArt.Resource = res
-			ui.AlbumArt.Show()
-			ui.ArtContainer.Show()
-		} else {
-			ui.AlbumArt.Hide()
-			ui.ArtContainer.Hide()
+		if s.AlbumArtURL != ui.LastArtURL {
+			res, err := fyne.LoadResourceFromURLString(s.AlbumArtURL)
+			if err == nil {
+				ui.AlbumArt.Resource = res
+				ui.AlbumArt.Show()
+				ui.ArtContainer.Show()
+				ui.LastArtURL = s.AlbumArtURL
+				
+				// Dynamic Color extraction
+				go func() {
+					tintColor := getAverageColor(res)
+					fyne.Do(func() {
+						ui.BgRect.FillColor = tintColor
+						ui.BgRect.Refresh()
+					})
+				}()
+			} else {
+				ui.AlbumArt.Hide()
+				ui.ArtContainer.Hide()
+				ui.BgRect.FillColor = color.NRGBA{R: 30, G: 30, B: 30, A: 255}
+			}
 		}
 	} else {
 		ui.AlbumArt.Hide()
 		ui.ArtContainer.Hide()
+		ui.LastArtURL = ""
+		ui.BgRect.FillColor = color.NRGBA{R: 30, G: 30, B: 30, A: 255}
 	}
 	ui.AlbumArt.Refresh()
+	ui.BgRect.Refresh()
 
 	// Play/Pause
 	if s.IsPlaying {
@@ -292,8 +421,10 @@ func updateUI(ui *RoomUI, s *Speaker) {
 		ui.LoudnessBtn.Importance = widget.MediumImportance
 	}
 
-	// Volume
+	// Volume & EQ
 	ui.VolSlider.SetValue(float64(s.Volume))
+	ui.BassSlider.SetValue(float64(s.Bass))
+	ui.TrebleSlider.SetValue(float64(s.Treble))
 
 	// Wi-Fi
 	ui.IPLabel.SetText(fmt.Sprintf("IP: %s", s.IP))

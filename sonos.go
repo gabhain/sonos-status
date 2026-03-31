@@ -35,6 +35,9 @@ type Speaker struct {
 	DurationSec       int
 	ProgressSec       int
 	WifiStrength      int // RSSI (dBm)
+	Bass              int
+	Treble            int
+	OnUpdate          func()
 	Player            *sonos.ZonePlayer
 }
 
@@ -545,6 +548,12 @@ func (s *Speaker) UpdateStatus() error {
 		s.Loudness = l
 	}
 
+	// Fetch Bass/Treble
+	b, _ := s.Player.GetBass()
+	s.Bass = b
+	t, _ := s.Player.GetTreble()
+	s.Treble = t
+
 	// Fetch Wi-Fi Strength (Scrape status page)
 	s.WifiStrength = s.fetchRSSI()
 
@@ -650,4 +659,24 @@ func (s *Speaker) ToggleSpeechEnhancement() error {
 func (s *Speaker) ToggleLoudness() error {
 	if s.Player == nil { return nil }
 	return s.Player.SetLoudness(!s.Loudness)
+}
+
+func (s *Speaker) SetBass(val int) error {
+	if s.Player == nil { return nil }
+	return s.Player.SetBass(val)
+}
+
+func (s *Speaker) SetTreble(val int) error {
+	if s.Player == nil { return nil }
+	return s.Player.SetTreble(val)
+}
+
+func (s *Speaker) Next() error {
+	if s.Player == nil { return nil }
+	return s.Player.Next()
+}
+
+func (s *Speaker) Previous() error {
+	if s.Player == nil { return nil }
+	return s.Player.Previous()
 }

@@ -10,10 +10,12 @@ A lightweight, multi-room status dashboard for Sonos systems built with Go and t
     - Play/Pause toggle
     - Volume slider
     - Mute/Unmute
-- **Audio Modes**:
-    - Night Mode
-    - Speech Enhancement
-    - **Loudness** (New)
+- **Audio Modes & EQ**:
+    - Night Mode & Speech Enhancement toggles.
+    - **Bass & Treble** sliders for real-time sound tuning.
+- **System Tray / Menu Bar Mode**:
+    - The app runs in the background. Closing the main window hides it to the tray rather than quitting.
+    - Access the dashboard anytime from the macOS Menu Bar or Windows System Tray.
 - **Advanced Diagnostics**:
     - **Track Progress Bar**: Real-time position and duration (e.g., `01:45 / 03:20`).
     - **Interface Quality**: Detects connection type (Wired/Wireless) and reports signal quality (SNR/RSSI/SonosNet Quality).
@@ -66,7 +68,7 @@ This project uses **GitHub Actions** to automatically build and package the appl
 ## How it Works
 
 - **Discovery**: Uses SSDP (Simple Service Discovery Protocol) to find Sonos speakers on your local network.
-- **Status Updates**: Polls individual speakers for volume, mute, and playback state.
+- **Event-Driven Updates**: Unlike most utilities that poll every few seconds, this app uses **UPnP Event Subscriptions**. It starts a local lightweight event server that Sonos speakers notify immediately whenever a state changes (volume, track, EQ, etc.).
 - **Diagnostics**: Scrapes hidden internal Sonos diagnostic pages (on port 1400) to fetch high-fidelity signal strength (SNR) and mesh network (SonosNet) quality metrics.
 
 ## Dependencies
