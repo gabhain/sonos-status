@@ -685,8 +685,18 @@ func cleanString(s string) string {
 	if s == "" {
 		return ""
 	}
-	// If it's a URL or contains query parameters, take only the base name/path
+
+	// If it's a URL or contains query parameters
 	if strings.Contains(s, "?") {
+		// Check for service names in the query string first
+		lowerS := strings.ToLower(s)
+		if strings.Contains(lowerS, "playerid=sonosradio") || strings.Contains(lowerS, "partnerid=sonosradio") {
+			return "Sonos Radio"
+		}
+		if strings.Contains(lowerS, "source=tunein") || strings.Contains(lowerS, "bundleid=tunein") {
+			return "TuneIn Radio"
+		}
+
 		s = strings.Split(s, "?")[0]
 	}
 
@@ -704,6 +714,11 @@ func cleanString(s string) string {
 			s = s[:len(s)-len(ext)]
 			break
 		}
+	}
+
+	// If it contains "bump" and looks like a filename, it's probably an internal asset
+	if strings.Contains(strings.ToLower(s), "bump") && (strings.Contains(s, "_") || strings.Contains(s, "-")) {
+		return "Streaming Audio"
 	}
 
 	// Replace underscores with spaces for filenames
