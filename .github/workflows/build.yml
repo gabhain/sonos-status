@@ -23,7 +23,7 @@ jobs:
 
       - name: Package macOS App
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
+          export PATH=$(go env GOPATH)/bin:$PATH
           # Package as a .app first
           fyne package -os darwin -name "SonosStatus" -icon Icon.png
           
@@ -57,8 +57,10 @@ jobs:
 
       - name: Package Linux
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
+          export PATH=$(go env GOPATH)/bin:$PATH
           fyne package -os linux -name "SonosStatus" -icon Icon.png
+          # Debug to see what was actually created
+          ls -R
           # On Linux, fyne package sometimes uses the name from go.mod or binary name
           # We ensure the target file exists or rename it to SonosStatus
           if [ -f "sonos-status" ] && [ ! -f "SonosStatus" ]; then mv sonos-status SonosStatus; fi
@@ -91,7 +93,7 @@ jobs:
 
       - name: Package Windows
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
+          export PATH=$(go env GOPATH)/bin:$PATH
           # Cross-compile for Windows
           GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc fyne package -os windows -name "SonosStatus" -icon Icon.png
           # If output is lowercase from module name, rename it
